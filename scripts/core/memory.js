@@ -32,10 +32,11 @@ export class WorldMemory {
     recordFailure(key, tick) {
         const c = (this.failures.get(key)?.c ?? 0) + 1;
         this.failures.set(key, { c, t: tick });
+        if (this.failures.size > 256) this.failures.delete(this.failures.keys().next().value);
         return c;
     }
     failureCount(key) { return this.failures.get(key)?.c ?? 0; }
-    recordPortal(pos, dimension, tick) { this.portals.push({ kind: 'portal', pos, dimension, tick }); }
+    recordPortal(pos, dimension, tick) { this.portals.push({ kind: 'portal', pos, dimension, tick }); if (this.portals.length > 32) this.portals.shift(); }
     portalsIn(dimension) { return this.portals.filter((p) => p.dimension === dimension); }
     recordDeath(d) { this.deaths.push(d); if (this.deaths.length > 20)
         this.deaths.shift(); }

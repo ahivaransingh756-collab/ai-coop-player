@@ -2,22 +2,40 @@
   "format_version": 2,
   "header": {
     "name": "Speedrun Co-op Bot",
-    "description": "In-world AI teammate (GameTest SimulatedPlayer) for Ender Dragon co-op runs.",
+    "description": "Evidence-checked Bedrock co-op speedrun assistant. Automatic gathering, survival and portal travel; explicit human crafting and boss-fight handoffs.",
     "uuid": "8d8d4cef-7a59-4749-b9c3-081d3d50bf59",
-    "version": [0, 1, 0],
-    "min_engine_version": [1, 21, 114]
+    "version": [
+      0,
+      2,
+      0
+    ],
+    "min_engine_version": [
+      1,
+      21,
+      114
+    ]
   },
   "modules": [
     {
       "type": "script",
       "language": "javascript",
       "uuid": "32dd6c2b-1651-439c-9056-e8a482393960",
-      "version": [0, 1, 0],
+      "version": [
+        0,
+        2,
+        0
+      ],
       "entry": "scripts/main.js"
     }
   ],
   "dependencies": [
-    { "module_name": "@minecraft/server", "version": "2.3.0-beta" },
-    { "module_name": "@minecraft/server-gametest", "version": "1.0.0-beta" }
+    {
+      "module_name": "@minecraft/server",
+      "version": "2.3.0-beta"
+    },
+    {
+      "module_name": "@minecraft/server-gametest",
+      "version": "1.0.0-beta"
+    }
   ]
 }

@@ -7,6 +7,10 @@ export class TaskGraph {
         this.profile = profile;
     }
     add(spec) {
+        if (spec.id.startsWith('adhoc-')) {
+            const old = this.all().filter(t => t.spec.id.startsWith('adhoc-') && t.status !== 'running');
+            if (old.length >= 64) this.tasks.delete(old[0].spec.id);
+        }
         if (this.tasks.has(spec.id))
             throw new Error(`duplicate task id: ${spec.id}`);
         for (const d of spec.dependsOn)
@@ -45,8 +49,8 @@ export class TaskGraph {
         return this.all().filter((t) => t.status === 'pending' && this.depsSatisfied(t.spec.id));
     }
     /** Cheapest startable task by estimated time inflated by risk (weight depends on the profile). */
-    next(snap) {
-        const ready = this.frontier().filter((t) => this.unmet(t.spec.id, snap).length === 0);
+    next(snap, accept = () => true) {
+        const ready = this.frontier().filter((t) => this.unmet(t.spec.id, snap).length === 0 && (t.availableAtTick ?? 0) <= snap.tick && accept(t));
         const cost = (t) => t.spec.estimatedSeconds * (1 + t.spec.risk * RISK_WEIGHT[this.profile]);
         return ready.sort((a, b) => cost(a) - cost(b))[0];
     }
@@ -61,6 +65,7 @@ export class TaskGraph {
         t.status = 'running';
         t.attempts++;
         t.startedTick = tick;
+        delete t.availableAtTick;
         delete t.lastFailure;
     }
     succeed(id, tick) {
@@ -78,6 +83,7 @@ export class TaskGraph {
             return 'failed';
         }
         t.status = 'pending';
+        t.availableAtTick = tick + Math.min(600, 40 * 2 ** Math.max(0, t.attempts - 1));
         return 'retry';
     }
     /** Pause a running task without spending a retry (e.g. the human needs help). */
@@ -115,6 +121,7 @@ export class TaskGraph {
             return;
         t.status = 'pending';
         t.attempts = 0;
+        delete t.availableAtTick;
         delete t.lastFailure;
         for (const d of t.spec.dependsOn)
             if (['failed', 'cancelled'].includes(this.tasks.get(d)?.status ?? ''))
@@ -123,7 +130,7 @@ export class TaskGraph {
     exportProgress() {
         const out = {};
         for (const t of this.tasks.values()) {
-            const p = { status: t.status === 'running' ? 'pending' : t.status, attempts: t.attempts };
+            const p = { status: t.status === 'running' ? 'pending' : t.status, attempts: t.status === 'running' ? Math.max(0, t.attempts - 1) : t.attempts };
             if (t.lastFailure !== undefined)
                 p.lastFailure = t.lastFailure;
             out[t.spec.id] = p;
@@ -131,14 +138,15 @@ export class TaskGraph {
         return out;
     }
     importProgress(p) {
-        for (const [id, v] of Object.entries(p)) {
-            const t = this.tasks.get(id);
-            if (!t)
-                continue;
-            t.status = v.status;
+        if (!p || typeof p !== 'object' || Array.isArray(p)) return;
+        for (const t of this.tasks.values()) {
+            const v = p[t.spec.id];
+            if (!v || !['pending', 'running', 'succeeded', 'failed', 'cancelled'].includes(v.status) || !Number.isInteger(v.attempts) || v.attempts < 0 || v.attempts > t.spec.maxRetries + 1) continue;
+            // Import in topological order; never accept a success with incomplete prerequisites.
+            t.status = v.status === 'running' ? 'pending' : v.status;
+            if (t.status === 'succeeded' && !this.depsSatisfied(t.spec.id)) t.status = 'pending';
             t.attempts = v.attempts;
-            if (v.lastFailure !== undefined)
-                t.lastFailure = v.lastFailure;
+            if (typeof v.lastFailure === 'string') t.lastFailure = v.lastFailure.slice(0, 256);
         }
     }
     require(id) {

@@ -1,3 +1,4 @@
+import { canExcavate, pickaxeTier } from '../core/safety.js';
 import { RESOURCES } from './resources.js';
 import { countItems } from '../core/types.js';
 import { sortedOffsets } from '../core/spatial.js';
@@ -25,13 +26,18 @@ export class GatherBlocks {
     lastBreak = -999;
     stuck = new StuckDetector();
     start(ctx, params) {
-        const res = RESOURCES[String(params.resource)];
+        const res = Object.hasOwn(RESOURCES, String(params.resource)) ? RESOURCES[String(params.resource)] : undefined;
         if (!res)
             throw new Error(`unknown resource "${String(params.resource)}"`);
         this.def = res;
-        this.target = Math.max(1, Number(params.count ?? 1));
+        this.target = Number(params.count ?? 1);
+        if (!Number.isInteger(this.target) || this.target < 1 || this.target > 64)
+            throw new Error('gather count must be an integer from 1 to 64');
+        this.total = params.total === true;
         const snap = ctx.body.snapshot();
-        this.baseline = countItems(snap.inventory, res.itemMatch);
+        this.baseline = this.total ? 0 : (params.baseline ?? countItems(snap.inventory, res.itemMatch));
+        this.dimension = snap.dimension;
+        this.lastBreak = -999;
         this.blacklist.clear();
         this.stuckCount = 0;
         this.block = undefined;
@@ -43,12 +49,16 @@ export class GatherBlocks {
         const now = snap.tick;
         if (!snap.alive)
             return { status: 'failed', reason: 'bot died' };
+        if (snap.dimension !== this.dimension)
+            return { status: 'failed', reason: 'dimension changed during gathering' };
+        if (this.def.tier && !Object.keys(snap.inventory).some(id => snap.inventory[id] > 0 && pickaxeTier(id) >= this.def.tier))
+            return { status: 'failed', reason: `requires pickaxe tier ${this.def.tier}; hand me a suitable pickaxe` };
         const gained = countItems(snap.inventory, this.def.itemMatch) - this.baseline;
         if (gained >= this.target) {
             this.cancel(ctx);
             return { status: 'succeeded', detail: `collected ${gained} ${this.def.label}` };
         }
-        if (snap.emptySlots === 0) {
+        if (snap.emptySlots === 0 && !ctx.body.canCollect?.(this.def.itemMatch)) {
             this.cancel(ctx);
             return { status: 'failed', reason: `inventory full after ${gained} ${this.def.label}` };
         }
@@ -89,7 +99,7 @@ export class GatherBlocks {
             probes++;
             const p = v3(Math.floor(this.origin.x) + o.x, Math.floor(this.origin.y) + o.y, Math.floor(this.origin.z) + o.z);
             const b = ctx.world.blockAt(p);
-            if (b && this.def.blockMatch(b.typeId) && !this.blacklist.has(keyOf(p))) {
+            if (b && this.def.blockMatch(b.typeId) && !this.blacklist.has(keyOf(p)) && canExcavate(ctx.world, p, this.origin)) {
                 this.block = p;
                 ctx.memory.rememberResource(this.def.label, p, dim, now);
                 this.lastNav = -999;
@@ -130,7 +140,7 @@ export class GatherBlocks {
             }
             this.lastNav = -999; // local replan: re-issue navigation
         }
-        if (now - this.lastNav >= 20) {
+        if (ctx.body.snapshot().onGround && now - this.lastNav >= 20) {
             this.lastNav = now;
             if (ctx.body.navigateToBlock(blk, 1) === 'failed')
                 this.reject(ctx, 'no path', now, pos);
@@ -158,14 +168,22 @@ export class GatherBlocks {
             this.enter('approach', now);
             return { status: 'running' };
         }
-        if (now - this.stateSince > 240) {
+        if (now - this.stateSince > 600) {
             this.reject(ctx, 'break timeout', now, pos);
             return { status: 'running' };
         }
-        if (now - this.lastBreak >= 20) {
+        if (!canExcavate(ctx.world, blk, pos)) {
+            this.reject(ctx, 'unsafe excavation', now, pos);
+            return { status: 'running' };
+        }
+        if (this.lastBreak < this.stateSince) {
             this.lastBreak = now;
             ctx.body.lookAt(center(blk));
-            ctx.body.breakBlock(blk);
+            if (this.def.tier && !ctx.body.equipPickaxe(this.def.tier)) {
+                this.reject(ctx, 'no suitable pickaxe', now, pos);
+                return { status: 'running' };
+            }
+            if (!ctx.body.breakBlock(blk)) this.reject(ctx, 'break rejected', now, pos);
         }
         return { status: 'running' };
     }
