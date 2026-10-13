@@ -23,7 +23,7 @@ export class Defend {
         if (!snap.alive)
             return { status: 'failed', reason: 'bot died' };
         const hp = factValue(snap.health);
-        const threats = pickThreats(snap.hostiles, snap.position, factValue(snap.human)?.position, ctx.cfg.combat.threatRadius);
+        const threats = pickThreats(snap.hostiles, snap.position, (factValue(snap.human)?.dimension === snap.dimension ? factValue(snap.human).position : undefined), ctx.cfg.combat.threatRadius);
         if (threats.length === 0) {
             return now - this.lastThreat >= ctx.cfg.combat.clearTicks ? { status: 'succeeded', detail: 'area clear' } : { status: 'running' };
         }
@@ -40,13 +40,14 @@ export class Defend {
         if (now - this.startTick < ctx.cfg.combat.reactionDelayTicks)
             return { status: 'running' };
         if (dist(t.position, snap.position) <= ctx.cfg.combat.attackRange) {
+            ctx.body.stopMoving();
             ctx.body.lookAt(t.position);
             if (now - this.lastAttack >= ctx.cfg.combat.attackCooldownTicks) {
                 this.lastAttack = now;
                 ctx.body.attackEntity(t.id);
             }
         }
-        else if (now - this.lastNav >= 10) {
+        else if (snap.onGround && now - this.lastNav >= 10) {
             this.lastNav = now;
             ctx.body.navigateToEntity(t.id, 1.2);
         }

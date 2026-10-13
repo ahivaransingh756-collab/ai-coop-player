@@ -1,7 +1,8 @@
 import { dist } from './vec.js';
 /** Hostiles near the human first (protect the teammate), then nearest to the bot. */
 export function pickThreats(hostiles, botPos, humanPos, radius) {
-    const near = hostiles.filter((h) => dist(h.position, botPos) <= radius || (humanPos !== undefined && dist(h.position, humanPos) <= radius));
+    const neutral = new Set(['minecraft:enderman', 'minecraft:piglin', 'minecraft:zombie_pigman', 'minecraft:zombified_piglin']);
+    const near = hostiles.filter((h) => !neutral.has(h.typeId) && h.typeId !== 'minecraft:ender_dragon').filter((h) => dist(h.position, botPos) <= radius || (humanPos !== undefined && dist(h.position, humanPos) <= radius));
     const score = (h) => (humanPos ? dist(h.position, humanPos) * 1.5 : 0) + dist(h.position, botPos);
     return near.sort((a, b) => score(a) - score(b));
 }

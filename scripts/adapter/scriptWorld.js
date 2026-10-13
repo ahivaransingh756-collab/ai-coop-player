@@ -1,3 +1,4 @@
+import { PREY } from '../autonomy/recipes.js';
 import { system } from '@minecraft/server';
 export class ScriptWorld {
     dimension;
@@ -15,6 +16,18 @@ export class ScriptWorld {
         catch {
             return undefined;
         }
+    }
+    animalsNear(pos, radius) {
+        const out = [];
+        try {
+            const dim = this.dimension();
+            if (!dim) return out;
+            // Whitelist queries: no players, pets or neutral combat mobs are food targets.
+            for (const type of Object.keys(PREY)) for (const e of dim.getEntities({ type, location: pos, maxDistance: radius })) {
+                out.push({ id: e.id, typeId: e.typeId, position: e.location, baby: !!e.getComponent('minecraft:is_baby'), protected: !!e.nameTag || !!e.getComponent('minecraft:tameable')?.isTamed });
+            }
+        } catch { /* unavailable entities */ }
+        return out;
     }
     droppedItemsNear(pos, radius) {
         const dim = this.dimension();

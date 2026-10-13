@@ -1,6 +1,8 @@
-import { system, world } from '@minecraft/server';
+import { Production } from './production.js';
+import { Direction, ItemStack, system, world } from '@minecraft/server';
 import { UNKNOWN, observed } from '../core/types.js';
 import { weaponRank } from '../core/combat.js';
+import { pickaxeTier, FOODS } from '../core/safety.js';
 import { dist } from '../core/vec.js';
 export class ScriptBody {
     sim;
@@ -11,6 +13,7 @@ export class ScriptBody {
         this.sim = sim;
         this.ownerName = ownerName;
         this.cfg = cfg;
+        this.production = new Production(this, (id, n) => new ItemStack(id, n), Direction.Up);
     }
     get player() { return this.sim; }
     valid() { try {
@@ -25,6 +28,15 @@ export class ScriptBody {
     catch {
         return undefined;
     } }
+    entityInfo(id) {
+        try {
+            const e = this.find(id);
+            if (!e?.isValid) return undefined;
+            return { id: e.id, typeId: e.typeId, position: e.location, dimension: e.dimension.id,
+                alive: (e.getComponent('minecraft:health')?.currentValue ?? 1) > 0,
+                baby: !!e.getComponent('minecraft:is_baby'), protected: !!e.nameTag || !!e.getComponent('minecraft:tameable')?.isTamed };
+        } catch { return undefined; }
+    }
     owner() {
         const n = this.ownerName();
         return n === undefined ? undefined : world.getAllPlayers().find((p) => p.name === n && p.id !== this.sim.id);
@@ -63,14 +75,16 @@ export class ScriptBody {
             }
             catch { /* unloaded */ }
         };
-        scan(sim.location, sim.dimension);
-        if (human && human.dimension.id === sim.dimension.id)
-            scan(human.location, human.dimension);
+        if (!this.threatCache || this.threatCache.dimension !== sim.dimension.id || tick - this.threatCache.tick >= 10) {
+            scan(sim.location, sim.dimension);
+            if (human && human.dimension.id === sim.dimension.id) scan(human.location, human.dimension);
+            this.threatCache = { tick, dimension: sim.dimension.id, values: [...hostiles.values()] };
+        }
         const hInfo = human && { name: human.name, position: human.location, dimension: human.dimension.id, health: this.healthOf(human, tick) };
         return {
             tick, alive: hp === undefined ? true : hp > 0, dimension: sim.dimension.id, position: sim.location, onGround: sim.isOnGround,
             health: hp === undefined ? UNKNOWN : observed(hp, tick), hunger: hunger === undefined ? UNKNOWN : observed(hunger, tick),
-            inventory, emptySlots: container?.emptySlotsCount ?? 0, hostiles: [...hostiles.values()],
+            inventory, emptySlots: container?.emptySlotsCount ?? 0, hostiles: this.threatCache.values,
             human: hInfo ? observed(hInfo, tick) : UNKNOWN,
         };
     }
@@ -128,6 +142,45 @@ export class ScriptBody {
         return false;
     } }
     say(message) { world.sendMessage(`§b[${this.cfg.botName}]§r ${message}`); }
+    selectItem(score) {
+        try {
+            const c = this.sim.getComponent('minecraft:inventory')?.container;
+            if (!c) return -1;
+            let best = -1, rank = 0;
+            for (let i = 0; i < c.size; i++) {
+                const it = c.getItem(i), r = it ? score(it.typeId) : 0;
+                if (r > rank) { rank = r; best = i; }
+            }
+            if (best < 0) return -1;
+            if (best >= 9) { c.swapItems(best, this.sim.selectedSlotIndex, c); best = this.sim.selectedSlotIndex; }
+            this.sim.selectedSlotIndex = best;
+            return best;
+        } catch { return -1; }
+    }
+    canCollect(match) {
+        try {
+            const c = this.sim.getComponent('minecraft:inventory')?.container;
+            if (!c) return false;
+            if (c.emptySlotsCount > 0) return true;
+            for (let i = 0; i < c.size; i++) {
+                const it = c.getItem(i);
+                if (it && match(it.typeId) && it.amount < it.maxAmount) return true;
+            }
+        } catch { /* invalid inventory */ }
+        return false;
+    }
+    dropItem(id) {
+        if (this.selectItem(item => item === id ? 1 : 0) < 0) return false;
+        try { return this.sim.dropSelectedItem(); } catch { return false; }
+    }
+    equipPickaxe(minTier) {
+        return this.selectItem(id => pickaxeTier(id) >= minTier ? pickaxeTier(id) : 0) >= 0;
+    }
+    useFood() {
+        const slot = this.selectItem(id => FOODS[id] ?? 0);
+        try { return slot >= 0 && this.sim.useItemInSlot(slot); } catch { return false; }
+    }
+    stopUsingItem() { try { this.sim.stopUsingItem(); } catch { /* invalid */ } }
     equipBestWeapon() {
         try {
             const c = this.sim.getComponent('minecraft:inventory')?.container;

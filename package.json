@@ -1,0 +1,15 @@
+{
+  "name": "bedrock-speedrun-coop",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "check": "node tools/check.mjs",
+    "pack": "python3 tools/pack.py"
+  },
+  "devDependencies": {
+    "@minecraft/server": "2.3.0-beta.1.21.114-stable",
+    "@minecraft/server-gametest": "1.0.0-beta.1.21.114-stable"
+  }
+}

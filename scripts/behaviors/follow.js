@@ -24,11 +24,13 @@ export class Follow {
         const now = snap.tick;
         switch (d.kind) {
             case 'idle':
+                ctx.body.stopMoving();
                 this.stuck.reset();
                 this.stuckEvents = 0;
                 this.lastTarget = undefined;
                 return { status: 'running' };
             case 'blocked':
+                ctx.body.stopMoving();
                 if (this.say.allow('blocked', now, 600))
                     ctx.body.say(d.reason);
                 return { status: 'running' };
@@ -46,7 +48,7 @@ export class Follow {
                         ctx.body.say(`I'm stuck ~${Math.round(dist(snap.position, human.position))} blocks away. Come closer or help me out.`);
                 }
                 const moved = !this.lastTarget || dist(this.lastTarget, d.target) > 2;
-                if (now - this.lastNav >= ctx.cfg.follow.repathTicks && (moved || now - this.lastNav >= 40)) {
+                if (snap.onGround && now - this.lastNav >= ctx.cfg.follow.repathTicks && (moved || now - this.lastNav >= 40)) {
                     this.lastNav = now;
                     this.lastTarget = d.target;
                     if (ctx.body.navigateTo(d.target, d.speed) === 'failed')
