@@ -1,4 +1,5 @@
-import { system, world } from '@minecraft/server';
+import { Production } from './production.js';
+import { Direction, ItemStack, system, world } from '@minecraft/server';
 import { UNKNOWN, observed } from '../core/types.js';
 import { weaponRank } from '../core/combat.js';
 import { pickaxeTier, FOODS } from '../core/safety.js';
@@ -12,6 +13,7 @@ export class ScriptBody {
         this.sim = sim;
         this.ownerName = ownerName;
         this.cfg = cfg;
+        this.production = new Production(this, (id, n) => new ItemStack(id, n), Direction.Up);
     }
     get player() { return this.sim; }
     valid() { try {
@@ -26,6 +28,15 @@ export class ScriptBody {
     catch {
         return undefined;
     } }
+    entityInfo(id) {
+        try {
+            const e = this.find(id);
+            if (!e?.isValid) return undefined;
+            return { id: e.id, typeId: e.typeId, position: e.location, dimension: e.dimension.id,
+                alive: (e.getComponent('minecraft:health')?.currentValue ?? 1) > 0,
+                baby: !!e.getComponent('minecraft:is_baby'), protected: !!e.nameTag || !!e.getComponent('minecraft:tameable')?.isTamed };
+        } catch { return undefined; }
+    }
     owner() {
         const n = this.ownerName();
         return n === undefined ? undefined : world.getAllPlayers().find((p) => p.name === n && p.id !== this.sim.id);

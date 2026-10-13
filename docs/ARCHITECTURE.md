@@ -1,5 +1,7 @@
 # Architecture and invariants
 
+**v0.3 update:** This page describes the retained co-op route. The separate `!bot auto` controller and its explicit modded crafting/furnace bridge are documented in [AUTONOMY.md](AUTONOMY.md). Its behavior deliberately differs from the v0.2 human-handoff design below.
+
 ## Layer boundaries
 
 ```text
@@ -55,7 +57,7 @@ All timing assumes nominal 20 ticks/second. It is controller timing, not real-ti
 ## Known limitations and extension seams
 
 - No global terrain planner, autonomous exploration, ore tunneling, bridging, armor equipping, shield tactics or ranged aiming.
-- No automatic furnace, crafting, portal construction, fortress search, bartering or dragon fighting.
+- The co-op route retains its handoffs. Auto mode now supports the documented crafting allowlist and real furnace operation, but not portal construction, fortress search, bartering or dragon fighting.
 - Default auto-defense excludes neutral endermen/piglins even if they become angry. It does not infer aggression state; manually manage those encounters. Other hostile engagements are basic melee, not expert combat.
 - Low-health policy stops rather than planning a retreat/healing shelter; the human must secure the area. Food use also stops movement while eating.
 - Native portal navigation is particularly sensitive to portal block height, path shape and the engine build. Test it with a clear lower-block target before any real run.

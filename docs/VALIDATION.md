@@ -4,7 +4,7 @@
 
 - `npm ci --ignore-scripts`: pinned declaration dependencies install.
 - `npm run check`: JavaScript syntax, relative imports, basic manifest layout.
-- `npm test`: deterministic Node tests using mocked bodies/worlds; includes all 18 co-op stages and negative victory checks.
+- `npm test`: deterministic Node tests using mocked bodies/worlds; includes all 18 co-op stages, negative victory checks, recipe rollback/fault injection, bounded perception/navigation, and an empty-inventory autonomous production simulation.
 - `npm run pack`: ZIP-format `.mcpack` containing the manifest and script files only.
 - `git diff --check`: whitespace/error-marker hygiene.
 
@@ -62,3 +62,16 @@ Use repeated controlled worlds, then diverse random worlds. Compare changes usin
 - Real eye observation and portal-room discovery.
 - Bedrock-specific ranged/crystal/dragon-phase combat and positive victory observation.
 - Multiple documented real end-to-end trials with no human handoffs.
+
+## v0.3 autonomous-mode real-game gates — pending
+
+- Verify `!bot auto` cannot authorize itself before same-owner confirmation; stop/disconnect/reload revokes production permissions.
+- Test every allowlisted recipe with exact ingredients, inventory overflow and protected/named inputs. Record before/after slots.
+- Verify supported table/furnace/gravel placement consumes real inventory and respects reach/obstructions.
+- Confirm furnace slot mapping (0 input, 1 fuel, 2 output), block inventory support, native transfer behavior and actual cooking times on the target build.
+- Confirm other players' unclaimed furnaces are not touched; residual fuel and inputs survive controller interruptions.
+- Run empty-inventory trials on varied real terrain with exposed and buried ore, sparse food, water barriers, hazards and moving animals.
+- Verify the bot never hunts a baby, named or tamed animal and never treats an unloaded animal as a food drop.
+- Verify local threat retreat, dangerous-floor reaction, eating preemption, healing timeout, tool replacement and the three-death cutoff.
+- Confirm `why` matches actual chosen prerequisites and `surroundings` distinguishes fresh blocks from old hints.
+- Complete several real autonomous Overworld-kit runs before making reliability/performance claims. Nether/End full autonomy remains a separate unimplemented release gate.

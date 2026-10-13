@@ -1,4 +1,7 @@
 export const COMMANDS = [
+    { name: 'auto', usage: '!bot auto', dangerous: true, implemented: true, minArgs: 0, maxArgs: 0 },
+    { name: 'why', usage: '!bot why', dangerous: false, implemented: true, minArgs: 0, maxArgs: 0 },
+    { name: 'surroundings', usage: '!bot surroundings', dangerous: false, implemented: true, minArgs: 0, maxArgs: 0 },
     { name: 'help', usage: '!bot help', dangerous: false, implemented: true, minArgs: 0, maxArgs: 0 },
     { name: 'ping', usage: '!bot ping', dangerous: false, implemented: true, minArgs: 0, maxArgs: 0 },
     { name: 'spawn', usage: '!bot spawn', dangerous: false, implemented: true, minArgs: 0, maxArgs: 0 },

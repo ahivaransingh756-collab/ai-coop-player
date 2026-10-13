@@ -1,5 +1,7 @@
 # Bedrock speedrun engineering audit
 
+**Historical v0.2 audit.** v0.3 implements a separately authorized, modded crafting/container bridge and local autonomous production. The original API finding (no general crafting UI automation) remains valid. See [AUTONOMY.md](AUTONOMY.md) for the new scope; statements below about unimplemented crafting/furnace operation describe v0.2.
+
 **Audit date:** 2026-10-13 UTC. **Runtime target:** repository baseline Bedrock 1.21.114. **Scope:** source/API inspection and deterministic controller tests, not exhaustive reverse engineering of the closed-source Bedrock engine or empirical speedrun benchmarking.
 
 ## 1. Sources and reproducibility

@@ -114,9 +114,13 @@ function execute(p, c) {
         return;
     }
     switch (c.name) {
+        case 'auto': return tell(p, brain.autonomous());
+        case 'why': return brain.autonomy.why().forEach(l => tell(p, l));
+        case 'surroundings': return brain.autonomy.surroundings(body.snapshot()).forEach(l => tell(p, l));
         case 'capabilities':
+            tell(p, '!bot auto: autonomous local exploration, crafting, furnace operation, hunting and iron-kit preparation. MODDED crafting; not full Nether/dragon autonomy.');
             tell(p, 'Automatic: follow, basic defense, safe-food use, nearby wood/stone/ore gathering, marked portal traversal.');
-            tell(p, 'Co-op handoffs: crafting/smelting, structures, bartering, End preparation, crystals/dragon fight. No inventory spawning, /locate or automatic victory claims.');
+            tell(p, 'Co-op route still uses handoffs. Auto mode consumes real ingredients through a scripted crafting bridge; other actions use actual survival inputs/furnaces. No /locate or fake victory.');
             tell(p, 'Beta API target: Bedrock 1.21.114. Not a leaderboard-legal autonomous runner; real-world testing is required.');
             return;
         case 'route': return brain.route().forEach(l => tell(p, l));
@@ -199,6 +203,7 @@ function handle(p, message) {
         }
         if (c.dangerous && c.implemented) {
             gate.request(p.name, c, system.currentTick);
+            if (c.name === 'auto') tell(p, 'Auto enables MODDED crafting/container automation, mines terrain, places stations and hunts adult food animals. It targets an Overworld iron kit, NOT a full dragon run. Confirm only in a backed-up test world.');
             tell(p, `"${c.name}" is risky. Say !bot confirm within 30s to proceed, or !bot cancel.`);
             return;
         }

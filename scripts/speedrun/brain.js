@@ -1,3 +1,4 @@
+import { AutonomousController } from '../autonomy/controller.js';
 import { Eat } from '../behaviors/eat.js';
 import { foodPoints } from '../core/safety.js';
 import { Travel } from '../behaviors/travel.js';
@@ -22,6 +23,7 @@ export class Brain {
     noEatUntil = 0;
     constructor(d) {
         this.d = d;
+        this.autonomy = new AutonomousController(d.ctx);
         for (const b of d.behaviors)
             this.byKind.set(b.kind, b);
     }
@@ -63,6 +65,12 @@ export class Brain {
         return this.d.graph.all().filter(t => !t.spec.id.startsWith('adhoc-')).map(t =>
             `${t.status === 'succeeded' ? '✓' : t.status === 'running' ? '>' : '·'} ${t.spec.id}: ${t.status} [${t.spec.kind === 'observe' ? 'co-op verification' : 'automatic'}]${t.lastFailure ? ` — ${t.lastFailure}` : ''}`);
     }
+    autonomous() {
+        this.halt();
+        const message = this.autonomy.start();
+        this.base = { type: this.autonomy.state === 'running' ? 'autonomous' : 'idle' };
+        return message;
+    }
     resume() {
         this.halt();
         const g = this.d.graph;
@@ -83,13 +91,19 @@ export class Brain {
             `Pos ${fmt(s.position.x)}, ${fmt(s.position.y)}, ${fmt(s.position.z)} in ${s.dimension.replace('minecraft:', '')} | HP ${hp ?? '?'} | Hunger ${hunger ?? '?'} | Logs ${logs}`,
             `Teammate: ${h ? `${h.name} at ${fmt(h.position.x)}, ${fmt(h.position.y)}, ${fmt(h.position.z)}` : 'not visible'} | Hostiles near: ${s.hostiles.length}`,
             `Route: ${done}/${tasks.length} steps done | ${this.d.telemetry.summary()}`,
-            `Active simulation time: ${Math.floor((this.ctx.run?.elapsedTicks ?? 0) / 20)}s (not a leaderboard timer). Co-op mode: crafting, structures and dragon fight need your help.`,
+            `Active simulation time: ${Math.floor((this.ctx.run?.elapsedTicks ?? 0) / 20)}s (not a leaderboard timer). ${this.base.type === 'autonomous' ? 'Autonomous Overworld production; modded crafting bridge enabled.' : 'Co-op route: structures and dragon fight need your help.'}`,
+            ...this.autonomy.why().slice(0, 2),
         ];
     }
     // ---- tick loop ---------------------------------------------------------------
     tick() {
         const snap = this.ctx.body.snapshot();
         this.ctx.run?.advance(snap.tick, this.base.type !== 'idle' || !!this.active);
+        if (this.base.type === 'autonomous') {
+            this.autonomy.tick(snap);
+            if (this.autonomy.state !== 'running') this.base = { type: 'idle' };
+            return;
+        }
         if (!snap.alive) {
             this.onDeath(snap);
             return;
@@ -286,7 +300,7 @@ export class Brain {
         }
         this.active = undefined;
     }
-    halt() { this.interrupt(this.ctx.body.snapshot().tick); }
+    halt() { this.autonomy.stop(); this.interrupt(this.ctx.body.snapshot().tick); }
     onDeath(s) {
         if (this.deadSince === undefined) {
             this.deadSince = s.tick;

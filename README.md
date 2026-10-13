@@ -1,24 +1,44 @@
 # Speedrun Co-op Bot · Bedrock
 
-An in-world survival teammate built on Bedrock's **GameTest SimulatedPlayer** API. Version **0.2.0** adds an evidence-checked, 18-stage **co-op** progression route from wood to a recorded dragon death.
+An in-world survival teammate built on Bedrock's **GameTest SimulatedPlayer** API. Version **0.3.0** adds an autonomous Overworld production mode alongside the evidence-checked, 18-stage **co-op** progression route.
 
-> **Not a fully autonomous speedrunner.** Crafting, furnace operation, fortress/stronghold exploration, bartering, crystal destruction and dragon combat still require a human. This release does not invent those capabilities, grant items, or treat missing entities as victory. Node tests pass; actual Bedrock gameplay has **not** been tested in this development environment. Do not use on a valuable world without a backup.
+> **Not yet a fully autonomous speedrunner.** `!bot auto` attempts to obtain food and an iron kit without human handoffs, using local terrain perception and an explicitly **modded, ingredient-consuming crafting/container bridge**. Nether progression, structure exploration, bartering and dragon combat remain unsupported in auto mode. Node tests pass, including an empty-inventory production simulation; actual Bedrock gameplay has **not** been tested here. Use a backed-up test world.
+
+## New: autonomous preparation
+
+```text
+!bot spawn
+!bot auto
+!bot confirm
+!bot why
+!bot surroundings
+```
+
+The confirmation explicitly authorizes terrain mining, station placement, adult food-animal hunting, and modded crafting/container access. It is not vanilla UI automation and makes no leaderboard-eligibility claim.
+
+The controller scans a bounded local block model, derives resource/tool prerequisites from **current inventory**, selects reachable targets, remembers failed attempts, revisits known resources/stations, hunts/cooks food, uses real furnaces, and replaces lost tools. It attempts retreat/healing when necessary and stops on unsupported terrain or unrecoverable faults. `!bot stop` cancels it and revokes crafting permission.
+
+**Completion means:** at least 40 food points, an iron-or-better pickaxe, iron sword, bucket (or water bucket), flint and steel, and a shield. It does **not** mean dragon victory, equipped armor/shield, a full speedrun, or guaranteed success on every seed. `!bot resume` still runs the separate co-op route; it does not resume auto mode.
+
+See [autonomy design, safety model and runtime limitations](docs/AUTONOMY.md).
 
 ## What it actually does
 
 | Capability | Implementation |
 |---|---|
 | Follow / basic defense | Native navigation, repath throttling, stuck detection; avoids automatically provoking endermen/piglins |
+| Autonomous production | Ingredient-driven tool/station crafting, native workstation placement, actual furnace input/fuel/output transfers, adult animal hunting |
+| Environmental planning | Bounded observed map, expiring facts, remembered resource hints, checked local paths and novelty-based exploration |
 | Gathering | Wood, cobblestone, raw iron, coal, gravel; correct minimum pickaxe tier, physical breaking and pickup |
 | Local excavation safety | Rejects unknown/liquid/hazard neighbors, sand/gravel overhead, and mining the supporting column |
-| Survival | Uses food from an inventory slot; verifies consumption; pauses at critical health; death/respawn handling |
+| Survival | Uses food from an inventory slot; verifies consumption; auto mode attempts retreat/healing and bounded respawn/replanning |
 | Progression | 18 stages; live inventory/block/dimension evidence; no manual “mark done” bypass |
 | Portal travel | Traverses **human-built, observed, marked** portals; verifies dimension change, not just movement acceptance |
 | Stronghold assistance | Least-squares estimate from **human-reported** eye flights, with degeneracy/backward-ray checks |
 | Recovery | Owner/version-scoped route checkpoints, paused restoration, retry backoff, task interruption without extra gathering |
 | Observability | `status`, `route`, capability disclosures, structured content logs, active-tick timing and stored splits |
 
-Local safety checks are **not** a global hazard-proof pathfinder. Native navigation can still fail on cliffs, liquids, stairs, unloaded chunks and portals. Mining can fail on enclosed or unreachable ore; there is no autonomous cave exploration or tunneling.
+Local safety checks are **not** a global hazard-proof pathfinder. Native navigation can still fail on cliffs, liquids, stairs, unloaded chunks and portals. Mining can fail on enclosed or unreachable ore; auto mode explores only connected, observed, traversable terrain. It cannot tunnel to buried ore, bridge gaps, or swim across oceans.
 
 ## Target version
 
@@ -40,7 +60,7 @@ npm test
 npm run pack
 ```
 
-The last command creates `dist/SpeedrunCoop-0.2.0.mcpack`. Import it into a compatible Bedrock installation, activate the behavior pack in a **backup/test world**, and enable the **Beta APIs** experiment. Enable cheats if you need the `/scriptevent` fallback. Enable the content log for diagnostics. If your installation refuses the declared module versions, use the target version or port and re-test—do not silently change dependency versions.
+The last command creates `dist/SpeedrunCoop-0.3.0.mcpack`. Import it into a compatible Bedrock installation, activate the behavior pack in a **backup/test world**, and enable the **Beta APIs** experiment. Enable cheats if you need the `/scriptevent` fallback. Enable the content log for diagnostics. If your installation refuses the declared module versions, use the target version or port and re-test—do not silently change dependency versions.
 
 `.npmrc` uses legacy peer resolution because the matching GameTest package's broad stable semver peer range excludes the explicitly pinned server prerelease. These packages are **development declarations**, not an emulator of the game engine. No npm dependencies are bundled in the pack.
 
@@ -68,7 +88,7 @@ If chat events do not work, run commands **as a player**:
 /scriptevent speedrunbot:cmd confirm
 ```
 
-### Resource handoffs
+### Co-op route resource handoffs
 
 ```text
 !bot gather wood 6
@@ -116,7 +136,9 @@ Move sideways at least 16 blocks (a wider baseline is better), repeat, then use 
 
 ### Saving and resetting
 
-Progress and waypoints save every 200 game ticks and at explicit lifecycle events. Restoration is owner-scoped and **always paused**. Completed stages are historical checkpoints, not a guarantee that the bot still owns consumed/lost supplies. Tool and portal checks are live when the corresponding action starts; replenish lost gear yourself.
+The **co-op route** progress and waypoints save every 200 game ticks and at explicit lifecycle events. Restoration is owner-scoped and **always paused**. Completed stages are historical checkpoints, not a guarantee that the bot still owns consumed/lost supplies. Tool and portal checks are live when the corresponding action starts; replenish lost gear yourself.
+
+**Auto-mode perception, planner state and furnace ownership are session-local and are not restored.** Auto mode always requires a fresh explicit start after reloading. Furnaces still contain whatever the game persisted; the new adapter will not automatically claim them.
 
 **Inventory/entities are not serialized.** Retrieve supplies before `!bot despawn`. Despawn before `/reload`; if a tagged bot survives a reload, duplicate spawning is refused—reopen the world. Do not rely on simulated-player inventory surviving disconnection. Eye bearings and uncompleted dragon-death evidence are deliberately not restored.
 
@@ -135,4 +157,4 @@ This resets the route, timing and waypoints, **not** your world or inventory. Ac
 - [Architecture and known limitations](docs/ARCHITECTURE.md)
 - [Required real-game acceptance tests](docs/VALIDATION.md)
 
-CI runs syntax/import checks, Node tests and packaging, then uploads the `.mcpack`. The tests include a **mocked** 18-stage co-op scenario; they are not evidence of a real autonomous dragon kill.
+CI runs syntax/import checks, Node tests and packaging, then uploads the `.mcpack`. The tests include a **mocked** 18-stage co-op scenario and an empty-inventory autonomous Overworld production scenario with a simulated furnace; neither is evidence of a real in-game autonomous run.
